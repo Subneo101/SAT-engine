@@ -1,0 +1,1 @@
+A text engine to handle responsiveness while maintaining the semantics using a combination of best fit, lost words penalty system  while converging to meaningful words maintained when the display width is starts reducing.. 
