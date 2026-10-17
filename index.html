@@ -1,0 +1,1070 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Semantic Adaptive Text — Compression &amp; Ellipsis Engine</title>
+<style>
+  :root{
+    --bg:#f4f6f9;
+    --panel:#ffffff;
+    --ink:#0d1526;
+    --ink-2:#39465c;
+    --muted:#7d8899;
+    --line:#e5e9ef;
+    --line-2:#eef1f6;
+    --accent:#2f6df6;
+    --accent-soft:#eaf0ff;
+    --accent-line:#c6d8ff;
+    --good:#0f9d58;
+    --good-soft:#e7f7ee;
+    --warn:#c2410c;
+    --warn-soft:#fff3e8;
+    --bad:#d92d20;
+    --radius:14px;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--sans);
+    font-size:14px;
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+    padding:28px 22px 80px;
+  }
+  .app{max-width:1180px;margin:0 auto}
+
+  /* ---------- hero ---------- */
+  .hero{display:flex;align-items:center;gap:14px;margin-bottom:22px}
+  .hero-mark{
+    width:44px;height:44px;flex:0 0 44px;border-radius:12px;
+    background:linear-gradient(140deg,#2f6df6,#7a5cf0);
+    color:#fff;font-weight:700;font-size:13px;letter-spacing:.04em;
+    display:grid;place-items:center;
+    box-shadow:0 6px 16px -6px rgba(47,109,246,.65);
+  }
+  .hero h1{margin:0;font-size:19px;font-weight:650;letter-spacing:-.015em}
+  .hero p{margin:1px 0 0;color:var(--muted);font-size:13px}
+  .hero code{font-family:var(--mono);font-size:12px;background:#e9edf3;padding:1px 5px;border-radius:5px;color:var(--ink-2)}
+
+  /* ---------- layout ---------- */
+  .layout{display:grid;grid-template-columns:400px minmax(0,1fr);gap:18px;align-items:start}
+  @media (max-width:900px){ .layout{grid-template-columns:1fr} }
+
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    box-shadow:0 1px 2px rgba(16,24,40,.04),0 8px 24px -18px rgba(16,24,40,.25);
+  }
+  .panel + .panel{margin-top:18px}
+  .panel-head{
+    display:flex;align-items:center;justify-content:space-between;gap:10px;
+    padding:13px 16px;border-bottom:1px solid var(--line-2);
+  }
+  .panel-title{font-size:12px;font-weight:650;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+  .panel-body{padding:16px}
+
+  /* ---------- controls ---------- */
+  .controls .panel-body{padding:16px 16px 18px}
+  .field{margin-bottom:15px}
+  .field:last-child{margin-bottom:0}
+  .field label{display:block;font-size:12px;font-weight:600;color:var(--ink-2);margin-bottom:6px;letter-spacing:.01em}
+  .field .hint{font-weight:400;color:var(--muted);font-size:11px}
+  select,input[type=text],input[type=number]{
+    width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:9px;
+    background:#fbfcfe;color:var(--ink);font-family:inherit;font-size:13px;outline:none;
+    transition:border-color .14s,box-shadow .14s;
+  }
+  select:focus,input[type=text]:focus,input[type=number]:focus{
+    border-color:var(--accent-line);box-shadow:0 0 0 3px var(--accent-soft);background:#fff;
+  }
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+
+  input[type=range]{
+    -webkit-appearance:none;appearance:none;width:100%;height:22px;background:transparent;margin:0;cursor:pointer;
+  }
+  input[type=range]::-webkit-slider-runnable-track{height:4px;border-radius:3px;background:#e3e8f0}
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:#fff;
+    border:2px solid var(--accent);margin-top:-6px;box-shadow:0 1px 4px rgba(16,24,40,.25);
+  }
+  input[type=range]::-moz-range-track{height:4px;border-radius:3px;background:#e3e8f0}
+  input[type=range]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:#fff;border:2px solid var(--accent)}
+
+  .slider-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:2px}
+  .slider-val{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--accent);background:var(--accent-soft);padding:1px 7px;border-radius:6px}
+
+  .check{display:flex;align-items:center;gap:9px;font-size:13px;color:var(--ink-2);cursor:pointer;user-select:none;padding:5px 0}
+  .check input{
+    appearance:none;-webkit-appearance:none;width:34px;height:19px;border-radius:999px;background:#dfe4ec;
+    position:relative;cursor:pointer;transition:background .16s;flex:0 0 34px;margin:0;
+  }
+  .check input::after{
+    content:"";position:absolute;top:2px;left:2px;width:15px;height:15px;border-radius:50%;
+    background:#fff;box-shadow:0 1px 2px rgba(16,24,40,.3);transition:transform .16s;
+  }
+  .check input:checked{background:var(--accent)}
+  .check input:checked::after{transform:translateX(15px)}
+
+  /* ---------- stage ---------- */
+  .stage-wrap{padding:26px 22px 22px;position:relative;overflow:hidden;background:#f7f7f7;mix-blend-mode:darken;}
+  .stage-grid{
+    position:absolute;inset:0;pointer-events:none;opacity:.85;
+    background-image:linear-gradient(to right,var(--line-2) 1px,transparent 1px);
+    background-size:20px 100%;
+  }
+  .stage-inner{position:relative;display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap}
+
+  .ruler{
+    position:relative;height:18px;flex:1 1 100%;margin-bottom:4px;
+  }
+  .ruler-line{position:absolute;top:20px;left:0;height:1px;background:var(--line);right:0}
+  .ruler-tick{position:absolute;top:13px;width:1px;height:11px;background:#d5dbe5}
+  .ruler-label{position:absolute;top:20;font-family:var(--mono);font-size:9px;color:#aab3c0;transform:translateX(-50%)}
+
+  .stage-box{
+    position:relative;
+    min-width:120px;
+    border:2px dashed var(--accent-line);
+    border-radius:10px;
+    background:#fcfdff;box-shadow:0px 0px 20px 0px #fff;
+    padding:12px 13px;
+    transition:width .16s cubic-bezier(.4,0,.2,1);
+    overflow:hidden;
+  }
+  .stage-box::before{
+    content:"";position:absolute;left:0;top:0;bottom:0;width:100%;
+    background:linear-gradient(0deg,var(--accent-soft),transparent 0%); background:white;
+    opacity:1;pointer-events:none;
+  }
+  .stage-text{
+    position:relative;
+    white-space:nowrap;
+    font-weight:560;
+    letter-spacing:-.01em;
+    color:var(--ink);
+    display:block;
+  }
+  .stage-text .ell{color:var(--accent);opacity:.75}
+  .stage-text .sep{color:var(--muted);font-weight:400}
+
+  .badges{display:flex;flex-wrap:wrap;gap:6px;margin-top:14px;flex:1 1 100%}
+  .badge{
+    font-family:var(--mono);font-size:11px;font-weight:600;
+    padding:3px 9px;border-radius:999px;border:1px solid var(--line);background:#fbfcfe;color:var(--ink-2);
+  }
+  .badge.accent{background:var(--accent-soft);border-color:var(--accent-line);color:#1d4ed8}
+  .badge.good{background:var(--good-soft);border-color:#c5ecd6;color:#0b7a45}
+  .badge.warn{background:var(--warn-soft);border-color:#fadfc7;color:#9a3412}
+
+  .fulltext{
+    flex:1 1 100%;margin-top:12px;padding-top:12px;border-top:1px solid var(--line-2);flex-direction:column;
+    font-size:12px;color:var(--muted);display:flex;gap:8px;align-items:baseline;
+  }
+  .fulltext .k{font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#aab3c0;flex:0 0 auto}
+  .fulltext .v{color:var(--ink-2);font-family:var(--sans);font-size:14px; padding-left:12px;text-wrap:nowrap; overflow:hidden;text-overflow:ellipsis;}
+  .overflow-transparent1{ -webkit-mask-image: linear-gradient(to right, rgba(0, 0, 0, 1) 80%, rgba(0, 0, 0, 0.5) 100%);
+  mask-image: linear-gradient(to right, rgba(0, 0, 0, 1) 80%, rgba(0, 0, 0, 0.2) 100%);}
+
+  /* ---------- trace ---------- */
+  .trace-body{padding:8px 10px 12px;max-height:420px;overflow:auto}
+  .trace-row{
+    display:grid;grid-template-columns:78px 44px minmax(0,1fr);gap:10px;align-items:center;
+    padding:6px 8px;border-radius:8px;border-left:3px solid transparent;
+  }
+  .trace-row + .trace-row{margin-top:1px}
+  .trace-row.fit{background:#fafcff}
+  .trace-row.over{opacity:.42}
+  .trace-row.win{background:var(--accent-soft);border-left-color:var(--accent)}
+  .trace-row.win .tier{color:#1d4ed8}
+  .trace-row.pass1{border-left-color:#cbd5e1}
+  .tier{font-family:var(--mono);font-size:10.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .loss{font-family:var(--mono);font-size:10.5px;color:#98a2b3;text-align:right}
+  .trace-text{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink-2)}
+  .trace-row.win .trace-text{color:var(--ink);font-weight:600}
+  .trace-empty{padding:18px;text-align:center;color:var(--muted);font-size:12px}
+
+  /* ---------- sweep ---------- */
+  .sweep-body{padding:12px 16px 18px;overflow-x:auto}
+  .sweep-row{display:flex;align-items:center;gap:12px;padding:5px 0}
+  .sweep-w{
+    font-family:var(--mono);font-size:10.5px;color:var(--muted);
+    flex:0 0 46px;text-align:right;
+  }
+  .sweep-track{
+    position:relative;height:26px;border-right:1px dashed var(--accent-line);
+    display:flex;align-items:center;flex:0 0 auto;
+  }
+  .sweep-bar{
+    position:absolute;left:0;top:4px;bottom:4px;border-radius:4px;
+    background:linear-gradient(90deg,var(--accent-soft),rgba(234,240,255,.25));
+    transition:width .16s;
+  }
+  .sweep-text{
+    position:relative;white-space:nowrap;font-size:13px;font-weight:550;letter-spacing:-.01em;
+    padding-left:2px;color:var(--ink);
+  }
+  .sweep-tier{
+    font-family:var(--mono);font-size:10px;color:#aab3c0;flex:0 0 auto;white-space:nowrap;
+  }
+
+  .legend{display:flex;flex-wrap:wrap;gap:14px;padding:0 16px 14px;font-size:11.5px;color:var(--muted)}
+  .legend span{display:flex;align-items:center;gap:6px}
+  .dot{width:8px;height:8px;border-radius:2px;display:inline-block}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header class="hero">
+    <div class="hero-mark">SAT</div>
+    <div>
+      <h1>Semantic Adaptive Text</h1>
+      <p>Progressive compression &amp; ellipsis for <code>Office Name — Location</code> strings</p>
+    </div>
+  </header>
+
+  <div class="layout">
+
+    <!-- ================= CONTROLS ================= -->
+    <aside class="panel controls">
+      <div class="panel-head"><span class="panel-title">Controls</span></div>
+      <div class="panel-body">
+
+        <div class="field">
+          <label>Sample <span class="hint">— pick a real-world string</span></label>
+          <select id="sampleSel"></select>
+        </div>
+
+        <div class="field">
+          <label>Custom text <span class="hint">— format: Office — Location</span></label>
+          <input type="text" id="customInput" placeholder="North West Swedish Medical Children Care Center- South Tacoma">
+        </div>
+
+        <div class="field">
+          <div class="slider-head">
+            <label style="margin:0">Container width</label>
+            <span class="slider-val" id="widthVal">500px</span>
+          </div>
+          <input type="range" id="widthRange" min="120" max="500" step="1" value="500">
+          <div class="row2" style="margin-top:8px">
+            <div>
+              <label style="font-size:11px;color:#aab3c0">MIN</label>
+              <input type="number" id="minW" value="120" min="40" max="400">
+            </div>
+            <div>
+              <label style="font-size:11px;color:#aab3c0">MAX</label>
+              <input type="number" id="maxW" value="500" min="140" max="900">
+            </div>
+          </div>
+        </div>
+
+        <div class="field">
+          <div class="slider-head">
+            <label style="margin:0">Font size</label>
+            <span class="slider-val" id="fsVal">14px</span>
+          </div>
+          <input type="range" id="fsRange" min="10" max="20" step="1" value="14">
+        </div>
+
+        <div class="field">
+          <label>Location truncation anchor</label>
+          <select id="anchorSel">
+            <option value="head" selected>Head — “Sout…”</option>
+            <option value="tail">Tail — “…coma”</option>
+            <option value="smart">Smart — best fit</option>
+          </select>
+        </div>
+
+        <div class="field" style="margin-bottom:2px">
+          
+          <label class="check"><input type="checkbox" id="optSweep" > Show width sweep</label>
+          <label class="check"><input type="checkbox" id="optTrace" > Show decision trace</label>
+          <label class="check"><input type="checkbox" id="optInitialism"> Allow org initialism <span class="hint" style="margin-left:auto">NWSMCCC</span></label>
+        </div>
+
+      </div>
+    </aside>
+
+    <!-- ================= MAIN ================= -->
+    <main>
+
+      <!-- STAGE -->
+      <section class="panel">
+        <div class="panel-head">
+          <span class="panel-title">Rendered output</span>
+          <span class="badge" id="passBadge">—</span>
+        </div>
+        <div class="stage-wrap">
+          <div class="stage-grid"></div>
+          <div class="stage-inner">
+            <div class="ruler" id="ruler"></div>
+            <div class="stage-box" id="stageBox">
+              <span class="stage-text" id="stageText"></span>
+            </div>
+            <div class="badges" id="stageBadges"></div>
+            <div class="fulltext">
+              <span class="k">Original Text with regular truncation</span>
+              <div class="v overflow-transparent" id="fullText"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TRACE -->
+      <section class="panel" id="tracePanel">
+        <div class="panel-head">
+          <span class="panel-title">Decision trace</span>
+          <span class="badge" id="traceCount">0 candidates</span>
+        </div>
+        <div class="trace-body" id="traceBody"></div>
+        <div class="legend">
+          <span><i class="dot" style="background:#2f6df6"></i> chosen</span>
+          <span><i class="dot" style="background:#fafcff;border:1px solid var(--line)"></i> fits budget</span>
+          <span><i class="dot" style="background:#cbd5e1"></i> overflow (dimmed)</span>
+          <span><i class="dot" style="background:(#e5e9ef)"></i> pass-1 first-fit</span>
+        </div>
+      </section>
+
+      <!-- SWEEP -->
+      <section class="panel " id="sweepPanel">
+        <div class="panel-head ">
+          <span class="panel-title">Width sweep</span>
+          <span class="badge" id="sweepInfo"></span>
+        </div>
+        <div class="sweep-body" id="sweepBody"></div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<script>
+/* ============================================================================
+   1. DICTIONARIES  (pure data — port these straight into your framework)
+   ========================================================================== */
+
+const ABBREV = {
+  medical:'Med', medicine:'Med', med:'Med',
+  center:'Ctr', centre:'Ctr', centers:'Ctrs', centres:'Ctrs',
+  children:'Child', childrens:'Child', pediatric:'Peds', pediatrics:'Peds',
+  hospital:'Hosp', hospitals:'Hosps',
+  university:'Univ', college:'Coll', institute:'Inst', institution:'Inst',
+  association:'Assoc', associates:'Assoc',
+  department:'Dept', division:'Div', directorate:'Dir',
+  services:'Svc', service:'Svc', system:'Sys', network:'Net',
+  regional:'Reg', community:'Comm', memorial:'Mem', general:'Gen',
+  specialty:'Spec', specialized:'Spec', surgical:'Surg', surgery:'Surg',
+  rehabilitation:'Rehab', behavioral:'Behav', foundation:'Fdn',
+  partners:'Ptnrs', physicians:'Phys', practice:'Prac',
+  international:'Intl', national:'Natl', technologies:'Tech', technology:'Tech',
+  management:'Mgmt', government:'Govt', information:'Info',
+  building:'Bldg', apartments:'Apts', avenue:'Ave', street:'St',
+  boulevard:'Blvd', drive:'Dr', road:'Rd', place:'Pl', court:'Ct',
+  lane:'Ln', parkway:'Pkwy', highway:'Hwy', square:'Sq', terrace:'Ter',
+  mount:'Mt', saint:'St', fort:'Ft', port:'Pt', lake:'Lk', valley:'Vly',
+  beach:'Bch', heights:'Hts', springs:'Spgs', junction:'Jct', township:'Twp',
+  incorporated:'Inc', limited:'Ltd', company:'Co', corporation:'Corp',
+  brothers:'Bros', group:'Grp'
+};
+
+const PHRASE_CANON = {
+  'north west':'NW', 'northwest':'NW', 'north east':'NE', 'northeast':'NE',
+  'south west':'SW', 'southwest':'SW', 'south east':'SE', 'southeast':'SE',
+  'university of washington':'UW', 'university of california':'UC',
+  'medical center':'Med Ctr', 'health system':'Health Sys',
+  'memorial hospital':'Mem Hosp', 'childrens hospital':'Child Hosp',
+  'united states':'US', 'u s':'US'
+};
+
+const DIRECTIONAL = {
+  north:'N.', south:'S.', east:'E.', west:'W.',
+  northeast:'NE', northwest:'NW', southeast:'SE', southwest:'SW'
+};
+
+const STOPWORDS = new Set(['of','the','and','for','at','in','on','to','a','an','&','by','with','de','la','del','los','las']);
+
+const GENERICS = new Set([
+  'center','centre','centers','centres','clinic','clinics','hospital','hospitals',
+  'health','healthcare','medical','medicine','care','group','grp','associates','assoc',
+  'institute','inst','services','svc','service','system','sys','network','net',
+  'regional','reg','community','comm','memorial','mem','general','gen','specialty',
+  'spec','surgical','surg','surgery','rehabilitation','rehab','behavioral','behav',
+  'foundation','fdn','partners','ptnrs','physicians','phys','practice','dental',
+  'vision','pharmacy','laboratory','labs','lab','urgent','primary','family','womens',
+  'women','children','child','childrens','pediatric','peds','cancer','heart',
+  'orthopedic','neurology','cardiology','oncology','incorporated','inc','llc','pllc',
+  'ltd','corp','co','company','limited','holdings','enterprises','affiliates',
+  'division','div','department','dept','unit','units','campus','branch','office',
+  'offices','location','locations','facility','facilities','building','bldg','tower',
+  'plaza','square'
+]);
+
+/* Loss model — lower = less semantic damage. */
+const LOSS = {
+  raw: 0, tidy: 0, legal: 1,
+  canonical: 3, abbrev: 5, stopwords: 10,
+  dropBase: 20, dropStep: 8,
+  ellipsis1: 45, ellipsis2: 40,   // 1st ellipsized side / 2nd side
+  initialism: 92
+};
+
+const ELLIPSIS_CHAR = '…';
+const MIN_ELLIPSIS_CHARS = 4;      // "4 chars + …"
+
+/* ============================================================================
+   2. MEASUREMENT
+   ========================================================================== */
+
+let __measEl = null;
+const __measCache = new Map();
+
+function measure(text, spec) {
+  const key = spec.fontSize + '|' + spec.fontWeight + '|' + spec.fontFamily + '|' + spec.letterSpacing + '|' + text;
+  const hit = __measCache.get(key);
+  if (hit !== undefined) return hit;
+  if (!__measEl) {
+    __measEl = document.createElement('span');
+    __measEl.setAttribute('aria-hidden', 'true');
+    __measEl.style.cssText =
+      'position:absolute;left:-99999px;top:0;white-space:pre;visibility:hidden;pointer-events:none;';
+    document.body.appendChild(__measEl);
+  }
+  __measEl.style.fontSize = spec.fontSize;
+  __measEl.style.fontWeight = spec.fontWeight;
+  __measEl.style.fontFamily = spec.fontFamily;
+  __measEl.style.letterSpacing = spec.letterSpacing || 'normal';
+  __measEl.textContent = text;
+  const w = __measEl.getBoundingClientRect().width;
+  __measCache.set(key, w);
+  return w;
+}
+
+/* ============================================================================
+   3. TEXT PRIMITIVES
+   ========================================================================== */
+
+function normalizeField(s) {
+  return (s || '')
+    .replace(/[\u2013\u2014]/g, '-')
+    .replace(/([A-Za-z])-([A-Za-z])/g, '$1 $2')   // North-West -> North West
+    .replace(/\s+/g, ' ')
+    .replace(/[\s.,;:]+$/, '')
+    .trim();
+}
+
+function stripLegal(s) {
+  return s.replace(/\b(inc|llc|pllc|ltd|corp|corporation|incorporated|company|co)\b\.?/gi, '')
+          .replace(/\s+/g, ' ').trim();
+}
+
+function abbrevToken(t) {
+  const bare = t.replace(/[.,]/g, '');
+  const low = bare.toLowerCase();
+  if (DIRECTIONAL[low]) return DIRECTIONAL[low];
+  if (ABBREV[low]) return ABBREV[low];
+  return t;
+}
+
+function phraseCanon(text, useAbbrev) {
+  const toks = text.split(' ').filter(Boolean);
+  const out = [];
+  let i = 0;
+  while (i < toks.length) {
+    let hit = null;
+    for (let len = Math.min(4, toks.length - i); len >= 2; len--) {
+      const key = toks.slice(i, i + len).join(' ').toLowerCase().replace(/[.,]/g, '');
+      if (PHRASE_CANON[key]) { hit = { key, len }; break; }
+    }
+    if (hit) { out.push(PHRASE_CANON[hit.key]); i += hit.len; }
+    else { out.push(useAbbrev ? abbrevToken(toks[i]) : toks[i]); i++; }
+  }
+  return out.join(' ');
+}
+
+function initialism(text) {
+  let s = '';
+  for (const t of text.split(' ').filter(Boolean)) {
+    const bare = t.replace(/[^A-Za-z0-9]/g, '');
+    if (!bare) continue;
+    if (bare.length <= 3 && bare === bare.toUpperCase()) s += bare;   // keep existing acronym
+    else s += bare[0].toUpperCase();
+  }
+  return s;
+}
+
+/* Word-importance scoring + progressive drop ladder */
+function tokenScore(t, isAcronym) {
+  const k = t.toLowerCase().replace(/[^a-z]/g, '');
+  if (STOPWORDS.has(k)) return 5;
+  if (isAcronym) return 95;
+  if (GENERICS.has(k)) return 30;
+  if (DIRECTIONAL[k]) return 45;
+  if (/^[A-Z]/.test(t)) return 85;
+  return 50;
+}
+
+function dropLadder(text, isOrg) {
+  const results = [];
+  let toks = text.split(' ').filter(Boolean);
+  const minTokens = isOrg ? 2 : 1;
+  for (let step = 0; step < 4; step++) {
+    if (toks.length <= minTokens) break;
+    const infos = toks.map((t, i) => {
+      const isAcr = t === t.toUpperCase() && /^[A-Z]{2,}$/.test(t);
+      return { i, score: tokenScore(t, isAcr) };
+    });
+    const droppable = infos.filter(x => {
+      if (isOrg && x.i === 0) return false;                    // protect brand head
+      if (x.i === toks.length - 1) return false;               // protect head noun / city
+      return true;
+    });
+    if (!droppable.length) break;
+    droppable.sort((a, b) => a.score - b.score || b.i - a.i);  // weakest first, rightmost tie-break
+    const victim = droppable[0];
+    if (victim.score >= 80) break;                             // never sacrifice a brand word
+    toks = toks.filter((_, i) => i !== victim.i);
+    results.push(toks.join(' '));
+  }
+  return results;
+}
+
+/* Office — Location splitter */
+function splitOffice(raw) {
+  const text = (raw || '').replace(/\s+/g, ' ').trim();
+  const seps = [' - ', ' \u2013 ', ' \u2014 ', ' | ', ' / ', ', ', '-', '\u2013', '\u2014'];
+  for (const s of seps) {
+    const idx = text.lastIndexOf(s);
+    if (idx > 0) {
+      const left = text.slice(0, idx).trim();
+      const right = text.slice(idx + s.length).trim();
+      if (left && right && right.split(' ').length <= 6) return { org: left, loc: right };
+    }
+  }
+  return { org: text, loc: '' };
+}
+
+/* ============================================================================
+   4. CANDIDATE BUILDERS
+   ========================================================================== */
+
+function buildCandidates(raw, role, allowInitialism) {
+  const isOrg = role === 'org';
+  const out = [];
+  const seen = new Set();
+  const add = (text, loss, tier) => {
+    text = (text || '').replace(/\s+/g, ' ').trim();
+    if (!text || seen.has(text)) return;
+    seen.add(text);
+    out.push({ text, loss, tier, role });
+  };
+
+  const n = normalizeField(raw);
+  if (!n) return [{ text: (raw || '').trim(), loss: 0, tier: 'raw', role }];
+
+  add(raw.trim(), LOSS.raw, 'raw');
+  add(n, LOSS.tidy, 'tidy');
+  add(stripLegal(n), LOSS.legal, 'legal');
+
+  const canon = phraseCanon(stripLegal(n), false);
+  add(canon, LOSS.canonical, 'canonical');
+
+  const abbr = phraseCanon(stripLegal(n), true);
+  add(abbr, LOSS.abbrev, 'abbrev');
+
+  const noStop = abbr.split(' ').filter(t => !STOPWORDS.has(t.toLowerCase().replace(/[^a-z]/g, ''))).join(' ');
+  add(noStop, LOSS.stopwords, 'stopwords');
+
+  dropLadder(noStop, isOrg).forEach((d, i) =>
+    add(d, LOSS.dropBase + i * LOSS.dropStep, 'drop-' + (i + 1)));
+
+  if (isOrg && allowInitialism) {
+    const ini = initialism(canon || n);
+    const flatLen = (canon || n).replace(/[^A-Za-z0-9]/g, '').length;
+    if (ini.length >= 2 && ini.length < flatLen) add(ini, LOSS.initialism, 'initialism');
+  }
+
+  out.sort((a, b) => a.loss - b.loss || a.text.length - b.text.length);
+  return out;
+}
+
+/* ============================================================================
+   5. ELLIPSIS SOLVER  (binary search on the longest prefix that fits)
+   ========================================================================== */
+
+function ellipsize(text, budget, spec, anchor) {
+  const full = measure(text, spec);
+  if (full <= budget) return { text, width: full, cut: false, chars: text.length };
+  if (budget <= measure(ELLIPSIS_CHAR, spec)) return null;
+
+  const attempt = (mode) => {
+    let lo = 0, hi = text.length, best = -1;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      const cand = mode === 'head'
+        ? text.slice(0, mid).replace(/\s+$/, '') + ELLIPSIS_CHAR
+        : ELLIPSIS_CHAR + text.slice(text.length - mid).replace(/^\s+/, '');
+      if (measure(cand, spec) <= budget) { best = mid; lo = mid + 1; }
+      else hi = mid - 1;
+    }
+    if (best < MIN_ELLIPSIS_CHARS) return null;
+
+    if (mode === 'head') {
+      let n = best;
+      const pre = text.slice(0, n);
+      const sp = pre.lastIndexOf(' ');
+      const frag = n - sp - 1;
+      if (sp > 0 && frag > 0 && frag < 3 && sp >= MIN_ELLIPSIS_CHARS) n = sp;
+      const out = text.slice(0, n).replace(/[\s,;:\-]+$/, '') + ELLIPSIS_CHAR;
+      return { text: out, width: measure(out, spec), cut: true, chars: n };
+    } else {
+      let st = text.length - best;
+      const seg = text.slice(st);
+      const sp = seg.indexOf(' ');
+      if (sp > 0 && sp < 3 && best - sp - 1 >= MIN_ELLIPSIS_CHARS) st = st + sp + 1;
+      const out = ELLIPSIS_CHAR + text.slice(st).replace(/^[\s,;:\-]+/, '');
+      return { text: out, width: measure(out, spec), cut: true, chars: text.length - st };
+    }
+  };
+
+  const modes = anchor === 'tail' ? ['tail'] : anchor === 'smart' ? ['head', 'tail'] : ['head'];
+  let best = null;
+  for (const m of modes) {
+    const r = attempt(m);
+    if (!r) continue;
+    if (!best || r.chars > best.chars || (r.chars === best.chars && r.width > best.width)) best = r;
+  }
+  return best;
+}
+
+/* ============================================================================
+   6. THE SOLVER — 3 passes
+   ========================================================================== */
+
+const SEPARATORS = [
+  { s: ' - ', loss: 0,  tier: 'dash' },
+  { s: ' \u00b7 ', loss: 6, tier: 'middot' },
+  { s: ' ',   loss: 12, tier: 'space' }
+];
+
+function solve(raw, budget, opts) {
+  const spec = opts.spec;
+  const anchor = opts.anchor || 'head';
+  const allowInitialism = !!opts.allowInitialism;
+  const fast = !!opts.fast;
+
+  const parts = splitOffice(raw);
+  const orgCands = buildCandidates(parts.org, 'org', allowInitialism);
+  const locCands = parts.loc ? buildCandidates(parts.loc, 'loc', false)
+                             : [{ text: '', loss: 0, tier: '—', role: 'loc' }];
+
+  /* ---------- static combinations ---------- */
+  const combos = [];
+  for (const o of orgCands) {
+    for (const l of locCands) {
+      for (const sp of SEPARATORS) {
+        const useSep = l.text ? sp.s : '';
+        const text = o.text + useSep + l.text;
+        const w = measure(text, spec);
+        combos.push({
+          kind: 'static',
+          text, width: w, fits: w <= budget + 0.5,
+          loss: o.loss + l.loss + (l.text ? sp.loss : 0),
+          tierLabel: l.text ? (o.tier + ' · ' + l.tier + (sp.loss ? ' · sep:' + sp.tier : '')) : o.tier,
+          org: o, loc: l, sepText: useSep
+        });
+      }
+    }
+  }
+
+  /* ---------- PASS 1 — greedy ladder (field-by-field, first fit) ---------- */
+  const ladderOrder = [...combos].sort((a, b) =>
+    (a.org.loss - b.org.loss) || (a.loc.loss - b.loc.loss) || (a.loss - b.loss));
+  const pass1 = ladderOrder.find(c => c.fits) || null;
+
+  /* ---------- PASS 2 — exhaustive cross-product, min total loss, max fill ---------- */
+  const bestOrder = [...combos].sort((a, b) => (a.loss - b.loss) || (b.width - a.width));
+  const pass2 = bestOrder.find(c => c.fits) || null;
+
+  /* ---------- PASS 3 — cross-field ellipsis + fill refinement ---------- */
+  const flexResults = [];
+  const orgLimit = fast ? 4 : orgCands.length;
+  const locLimit = fast ? 4 : locCands.length;
+  const ratios = fast ? [0.5, 0.35, 0.65] : [0.5, 0.42, 0.58, 0.35, 0.65, 0.28, 0.72];
+
+  for (let oi = 0; oi < Math.min(orgLimit, orgCands.length); oi++) {
+    for (let li = 0; li < Math.min(locLimit, locCands.length); li++) {
+      const o = orgCands[oi], l = locCands[li];
+      const hasLoc = !!l.text;
+      const sepW = hasLoc ? measure(' - ', spec) : 0;
+      const avail = budget - sepW;
+      if (avail <= 8) continue;
+
+      const oFull = measure(o.text, spec);
+      const lFull = hasLoc ? measure(l.text, spec) : 0;
+
+      const push = (orgText, locText, orgCut, locCut, sep, fill, chars) => {
+        const text = orgText + (hasLoc ? sep : '') + locText;
+        const w = measure(text, spec);
+        if (w > budget + 0.5) return;
+        const ellCount = (orgCut ? 1 : 0) + (locCut ? 1 : 0);
+        if (!ellCount) return;
+        const eLoss = LOSS.ellipsis1 + (ellCount > 1 ? LOSS.ellipsis2 : 0);
+        const sepLoss = sep === ' - ' ? 0 : sep === ' \u00b7 ' ? 6 : 12;
+        flexResults.push({
+          kind: 'ellipsis',
+          text, width: w, fits: true,
+          loss: o.loss + l.loss + eLoss + sepLoss,
+          tierLabel: (orgCut ? 'ell' : o.tier) + ' · ' + (locCut ? 'ell' : l.tier),
+          org: o, loc: l, sepText: hasLoc ? sep : '',
+          fill: w, chars
+        });
+      };
+
+      // A — org full, location ellipsized
+      if (hasLoc && oFull + lFull + sepW > budget) {
+        const r = ellipsize(l.text, avail - oFull, spec, anchor);
+        if (r) push(o.text, r.text, false, r.cut, ' - ', oFull + sepW + r.width, r.chars);
+      }
+      // B — org ellipsized, location full
+      if (hasLoc && oFull + lFull + sepW > budget) {
+        const r = ellipsize(o.text, avail - lFull, spec, anchor);
+        if (r) push(r.text, l.text, r.cut, false, ' - ', r.width + sepW + lFull, r.chars);
+      }
+      // C — both ellipsized, ratio search for best fill
+      if (hasLoc) {
+        const nat = oFull / ((oFull + lFull) || 1);
+        const tries = ratios.concat([nat]);
+        for (const r of tries) {
+          const ob = avail * r, lb = avail * (1 - r);
+          const oe = ellipsize(o.text, ob, spec, anchor);
+          const le = ellipsize(l.text, lb, spec, anchor);
+          if (!oe || !le) continue;
+          push(oe.text, le.text, oe.cut, le.cut, ' - ', oe.width + sepW + le.width, oe.chars + le.chars);
+        }
+        // also try the middot separator for a few extra pixels
+        const midW = measure(' \u00b7 ', spec);
+        const avail2 = budget - midW;
+        for (const r of [0.5, nat]) {
+          const oe = ellipsize(o.text, avail2 * r, spec, anchor);
+          const le = ellipsize(l.text, avail2 * (1 - r), spec, anchor);
+          if (!oe || !le) continue;
+          push(oe.text, le.text, oe.cut, le.cut, ' \u00b7 ', oe.width + midW + le.width, oe.chars + le.chars);
+        }
+      }
+      // D — no location at all
+      if (!hasLoc) {
+        const r = ellipsize(o.text, budget, spec, anchor);
+        if (r) push(r.text, '', r.cut, false, '', r.width, r.chars);
+      }
+    }
+  }
+
+  /* ---------- final arbitration: min loss, then max fill ---------- */
+  const pool = combos.filter(c => c.fits).concat(flexResults);
+  let winner = null;
+  for (const c of pool) {
+    if (!winner) { winner = c; continue; }
+    if (c.loss < winner.loss) { winner = c; continue; }
+    if (c.loss === winner.loss && c.width > winner.width) winner = c;
+  }
+
+  let pass3 = null;
+  if (winner && winner.kind === 'ellipsis') pass3 = winner;
+
+  return {
+    winner,
+    pass1: pass1 || null,
+    pass2: pass2 || null,
+    pass3,
+    combos,
+    flexResults,
+    org: parts.org,
+    loc: parts.loc,
+    budget
+  };
+}
+
+/* ============================================================================
+   7. DEMO UI
+   ========================================================================== */
+
+const SAMPLES = [
+  'North West Swedish Medical Children Care Center- South Tacoma',
+  'University of Washington Medical Center - South Lake Union',
+  "St. Mary's Regional Medical Center - East Falls Church",
+  'Kaiser Permanente Behavioral Health Services - North Hollywood',
+  "Children's Hospital of Philadelphia - University City",
+  'Memorial Sloan Kettering Cancer Center - Upper East Side',
+  'Mayo Clinic Family Medicine Associates - Northwest Rochester',
+  'Providence Swedish Edmonds Campus - South Snohomish',
+  'Duke University Health System - Research Triangle Park',
+  'Cleveland Clinic Foundation - Beachwood Heights',
+  'Baylor Scott & White Institute for Rehabilitation - Fort Worth',
+  'Intermountain Healthcare Primary Care Clinic - Salt Lake City'
+];
+
+const $ = id => document.getElementById(id);
+
+const sampleSel   = $('sampleSel');
+const customInput = $('customInput');
+const widthRange  = $('widthRange');
+const widthVal    = $('widthVal');
+const minW        = $('minW');
+const maxW        = $('maxW');
+const fsRange     = $('fsRange');
+const fsVal       = $('fsVal');
+const anchorSel   = $('anchorSel');
+const optInitialism = $('optInitialism');
+const optSweep    = $('optSweep');
+const optTrace    = $('optTrace');
+
+const stageBox   = $('stageBox');
+const stageText  = $('stageText');
+const stageBadges= $('stageBadges');
+const fullText   = $('fullText');
+const passBadge  = $('passBadge');
+const ruler      = $('ruler');
+const traceBody  = $('traceBody');
+const traceCount = $('traceCount');
+const tracePanel = $('tracePanel');
+const sweepBody  = $('sweepBody');
+const sweepPanel = $('sweepPanel');
+const sweepInfo  = $('sweepInfo');
+
+let currentRaw = SAMPLES[0];
+
+/* ---- populate samples ---- */
+SAMPLES.forEach((s, i) => {
+  const o = document.createElement('option');
+  o.value = i; o.textContent = s.length > 52 ? s.slice(0, 52) + '…' : s;
+  sampleSel.appendChild(o);
+});
+
+/* ---- spec ---- */
+function getSpec() {
+  const cs = getComputedStyle(stageText);
+  return {
+    fontSize: fsRange.value + 'px',
+    fontWeight: '560',
+    fontFamily: cs.fontFamily,
+    letterSpacing: '-0.01em'
+  };
+}
+
+/* ---- render helpers ---- */
+function esc(s) {
+  return s.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+}
+function markup(text) {
+  return esc(text)
+    .replace(/\u2026/g, '<span class="ell">\u2026</span>')
+    .replace(/ (-|\u00b7) /g, '<span class="sep">$1</span>');
+}
+
+/* ---- main render ---- */
+let rafPending = false;
+function scheduleRender() {
+  if (rafPending) return;
+  rafPending = true;
+  requestAnimationFrame(() => { rafPending = false; render(); });
+}
+
+function render() {
+  const spec = getSpec();
+  const budget = +widthRange.value;
+  const allowInit = optInitialism.checked;
+  const anchor = anchorSel.value;
+
+  const res = solve(currentRaw, budget, { spec, anchor, allowInitialism: allowInit, fast: false });
+  const w = res.winner;
+
+  /* ---- stage ---- */
+  stageBox.style.width = budget + 'px';
+  if (w) {
+    stageText.innerHTML = markup(w.text);
+    stageBox.setAttribute('title', currentRaw);
+    stageBox.setAttribute('aria-label', currentRaw);
+  } else {
+    stageText.textContent = '—';
+  }
+  fullText.textContent = currentRaw;
+  fullText.style.width=budget+'px';
+  fullText.style.fontSize=fsRange.value+'px';
+  
+
+  /* ---- badges ---- */
+  if (w) {
+    const passLabel = w.kind === 'ellipsis' ? 'PASS 3 · ellipsis search'
+                    : (res.pass2 && w.text === res.pass2.text && res.pass1 && w.text !== res.pass1.text)
+                      ? 'PASS 2 · cross-field search'
+                      : 'PASS 1 · greedy ladder';
+    passBadge.textContent = passLabel;
+    passBadge.className = 'badge ' + (w.kind === 'ellipsis' ? 'warn' : 'accent');
+
+    stageBadges.innerHTML = [
+      `<span class="badge accent">tier · ${esc(w.tierLabel)}</span>`,
+      `<span class="badge">loss ${w.loss}</span>`,
+      `<span class="badge good">${w.width.toFixed(1)} / ${budget}px · ${Math.round(w.width / budget * 100)}% fill</span>`,
+      `<span class="badge">${w.kind}</span>`
+    ].join('');
+  } else {
+    passBadge.textContent = 'no fit';
+    passBadge.className = 'badge warn';
+    stageBadges.innerHTML = '<span class="badge warn">No candidate fits — widen the container</span>';
+  }
+
+  /* ---- ruler ---- */
+  drawRuler(budget);
+
+  /* ---- trace ---- */
+  renderTrace(res, spec, budget);
+
+  /* ---- sweep ---- */
+  if (optSweep.checked) renderSweep(spec, allowInit, anchor);
+}
+
+function drawRuler(budget) {
+  const step = budget <= 200 ? 40 : budget <= 320 ? 60 : 100;
+  let html = '<div class="ruler-line"></div>';
+  for (let x = 0; x <= budget; x += step) {
+    html += `<div class="ruler-tick" style="left:${x}px"></div>`;
+    if (x > 0) html += `<div class="ruler-label" style="left:${x}px">${x}</div>`;
+  }
+  html += `<div class="ruler-tick" style="left:${budget}px;background:#2f6df6;height:16px;top:12px"></div>`;
+  ruler.innerHTML = html;
+}
+
+function renderTrace(res, spec, budget) {
+  if (!optTrace.checked) { tracePanel.style.display = 'none'; return; }
+  tracePanel.style.display = '';
+
+  const seen = new Set();
+  const rows = [];
+  const all = [...res.combos, ...res.flexResults].sort((a, b) => a.loss - b.loss || b.width - a.width);
+
+  for (const c of all) {
+    if (seen.has(c.text)) continue;
+    seen.add(c.text);
+    rows.push(c);
+    if (rows.length >= 22) break;
+  }
+
+  const winnerText = res.winner ? res.winner.text : null;
+
+  traceBody.innerHTML = rows.map(c => {
+    const isWin = c.text === winnerText;
+    const isP1 = res.pass1 && c.text === res.pass1.text && !isWin;
+    const cls = ['trace-row'];
+    cls.push(c.fits ? 'fit' : 'over');
+    if (isWin) cls.push('win');
+    else if (isP1) cls.push('pass1');
+    const label = c.tierLabel + (c.kind === 'ellipsis' ? '' : '');
+    return `<div class="${cls.join(' ')}">
+      <span class="tier">${esc(label)}</span>
+      <span class="loss">${c.loss}</span>
+      <span class="trace-text" title="${esc(c.text)}">${markup(c.text)}</span>
+    </div>`;
+  }).join('') || '<div class="trace-empty">No candidates</div>';
+
+  const fitCount = all.filter(c => c.fits).length;
+  traceCount.textContent = `${fitCount} fit · ${all.length} evaluated`;
+}
+
+function renderSweep(spec, allowInit, anchor) {
+  sweepPanel.style.display = '';
+  const lo = +minW.value, hi = +maxW.value;
+  const steps = 13;
+  const step = Math.max(8, Math.round((hi - lo) / (steps - 1)));
+
+  const widths = [];
+  for (let w = lo; w <= hi; w += step) widths.push(w);
+  if (widths[widths.length - 1] !== hi) widths.push(hi);
+
+  sweepBody.innerHTML = widths.map(w => {
+    const r = solve(currentRaw, w, { spec, anchor, allowInitialism: allowInit, fast: true });
+    const win = r.winner;
+    const text = win ? win.text : '—';
+    const fill = win ? Math.min(100, win.width / w * 100) : 0;
+    return `<div class="sweep-row">
+      <span class="sweep-w">${w}</span>
+      <span class="sweep-track" style="width:${w}px">
+        <span class="sweep-bar" style="width:${fill}%"></span>
+        <span class="sweep-text">${markup(text)}</span>
+      </span>
+      <span class="sweep-tier">${win ? esc(win.tierLabel) + ' · L' + win.loss : ''}</span>
+    </div>`;
+  }).join('');
+
+  sweepInfo.textContent = `${lo}–${hi}px · ${widths.length} samples`;
+}
+
+/* ============================================================================
+   8. EVENT WIRING
+   ========================================================================== */
+
+sampleSel.addEventListener('change', () => {
+  currentRaw = SAMPLES[+sampleSel.value];
+  customInput.value = '';
+  customInput.placeholder = currentRaw;
+  scheduleRender();
+});
+
+customInput.addEventListener('input', () => {
+  const v = customInput.value.trim();
+  if (v) { currentRaw = v; sampleSel.value = ''; scheduleRender(); }
+});
+
+widthRange.addEventListener('input', () => {
+  widthVal.textContent = widthRange.value + 'px';
+  scheduleRender();
+});
+
+fsRange.addEventListener('input', () => {
+  fsVal.textContent = fsRange.value + 'px';
+  stageText.style.fontSize = fsRange.value + 'px';
+  __measCache.clear();
+  scheduleRender();
+});
+
+anchorSel.addEventListener('change', scheduleRender);
+optInitialism.addEventListener('change', scheduleRender);
+optTrace.addEventListener('change', scheduleRender);
+
+optSweep.addEventListener('change', () => {
+  sweepPanel.style.display = optSweep.checked ? '' : 'none';
+  scheduleRender();
+});
+
+function syncBounds() {
+  let lo = Math.max(40, +minW.value || 120);
+  let hi = Math.max(lo + 40, +maxW.value || 500);
+  minW.value = lo; maxW.value = hi;
+  widthRange.min = lo;
+  widthRange.max = hi;
+  if (+widthRange.value < lo) widthRange.value = lo;
+  if (+widthRange.value > hi) widthRange.value = hi;
+  widthVal.textContent = widthRange.value + 'px';
+  __measCache.clear();
+  scheduleRender();
+}
+minW.addEventListener('change', syncBounds);
+maxW.addEventListener('change', syncBounds);
+
+/* ---- boot ---- */
+stageText.style.fontSize = fsRange.value + 'px';
+stageText.style.fontWeight = '500';
+stageText.style.letterSpacing = '-0.01em';
+widthVal.textContent = widthRange.value + 'px';
+customInput.placeholder = SAMPLES[0];
+syncBounds();
+
+document.fonts && document.fonts.ready.then(() => { __measCache.clear(); render(); });
+</script>
+</body>
+</html>
